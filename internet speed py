@@ -1,0 +1,112 @@
+import speedtest
+import socket
+import tkinter as tk
+from tkinter import ttk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
+import numpy as np
+import threading
+import time
+
+class SpeedTestGUI:
+    def __init__(self, root):
+        print("\n[INFO] Program developed by Auspicious.")
+        print("[INFO] Unauthorized copying or modification without credit is discouraged.\n")
+
+        self.root = root
+        self.root.title("Real-Time Internet Speed Test")
+        self.root.geometry("520x550")
+
+        self.label = ttk.Label(root, text="Real-Time Internet Speed Test", font=("Arial", 16))
+        self.label.pack(pady=10)
+
+        self.canvas_frame = ttk.Frame(root)
+        self.canvas_frame.pack()
+
+        self.result_label = ttk.Label(root, text="", font=("Arial", 12))
+        self.result_label.pack(pady=10)
+
+        self.start_button = ttk.Button(root, text="Start Test", command=self.start_test)
+        self.start_button.pack(pady=10)
+
+        self.credit_label = ttk.Label(root, text="© Created by Auspicious", font=("Arial", 10, "italic"))
+        self.credit_label.pack(side="bottom", pady=5)
+
+        self.create_speedometer()
+
+    def create_speedometer(self):
+        self.fig, self.ax = plt.subplots(subplot_kw={'projection': 'polar'}, figsize=(4, 4))
+        self.ax.set_theta_offset(np.pi / 2)
+        self.ax.set_theta_direction(-1)
+        self.ax.set_ylim(0, 100)  # Max scale: 100 Mbps (auto-adjustable later)
+        self.speed_pointer, = self.ax.plot([0, 0], [0, 50], linewidth=3, color='red')
+        self.ax.set_xticks([])
+        self.ax.set_yticks([])
+        self.ax.set_facecolor('#f0f0f0')
+
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.canvas_frame)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().pack()
+
+    def update_speedometer(self, speed, max_speed=100):
+        angle = np.interp(min(speed, max_speed), [0, max_speed], [0, np.pi])
+        self.speed_pointer.set_data([0, angle], [0, 50])
+        self.canvas.draw()
+
+    def run_speedtest(self):
+        try:
+            st = speedtest.Speedtest()
+            st.get_best_server()
+
+            # Fetch public IP
+            ip_address = socket.gethostbyname(socket.gethostname())
+            ping = st.results.ping
+
+            self.result_label.config(text=f"Your IP: {ip_address}\nPing: {ping:.2f} ms\n\nTesting download speed...")
+
+            # --- Real-time Download ---
+            total_download = 0
+            download_speed = 0
+            for _ in range(10):  # 10 samples
+                chunk_speed = st.download() / 1024 / 1024 / 10  # simulate per sample
+                total_download += chunk_speed
+                download_speed = total_download
+                self.update_speedometer(download_speed)
+                self.result_label.config(text=f"Your IP: {ip_address}\nPing: {ping:.2f} ms\nDownload: {download_speed:.2f} Mbps")
+                time.sleep(0.3)
+
+            self.result_label.config(text=f"Your IP: {ip_address}\nPing: {ping:.2f} ms\n\nTesting upload speed...")
+
+            # --- Real-time Upload ---
+            total_upload = 0
+            upload_speed = 0
+            for _ in range(10):
+                chunk_speed = st.upload() / 1024 / 1024 / 10
+                total_upload += chunk_speed
+                upload_speed = total_upload
+                self.update_speedometer(upload_speed)
+                self.result_label.config(text=f"Your IP: {ip_address}\nPing: {ping:.2f} ms\nUpload: {upload_speed:.2f} Mbps")
+                time.sleep(0.3)
+
+            self.result_label.config(
+                text=(
+                    f"Your IP: {ip_address}\n"
+                    f"Ping: {ping:.2f} ms\n"
+                    f"Download: {download_speed:.2f} Mbps\n"
+                    f"Upload: {upload_speed:.2f} Mbps\n\n"
+                    f"[Note: Program by Auspicious]"
+                )
+            )
+
+        except Exception as e:
+            self.result_label.config(text=f"Error: {e}")
+
+    def start_test(self):
+        threading.Thread(target=self.run_speedtest).start()
+
+if __name__ == "__main__":
+    print("Launching Real-Time Internet Speed Test...")
+    print("Developed by Auspicious (© All Rights Reserved)")
+    root = tk.Tk()
+    app = SpeedTestGUI(root)
+    root.mainloop()
